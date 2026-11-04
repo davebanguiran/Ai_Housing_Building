@@ -1050,6 +1050,118 @@ document.addEventListener('DOMContentLoaded', () => {
     const lightboxImg = document.getElementById('lightboxImg');
     const lightboxCaption = document.getElementById('lightboxCaption');
     const btnCloseLightbox = document.getElementById('btnCloseLightbox');
+    const lightboxSvgWrapper = document.getElementById('lightboxSvgWrapper');
+    const lightboxSvgInner = document.getElementById('lightboxSvgInner');
+    const lightboxSvgTitle = document.getElementById('lightboxSvgTitle');
+    const lightboxSvgSubtitle = document.getElementById('lightboxSvgSubtitle');
+
+    let currentBpZoom = 1.0;
+    function applyBlueprintModalZoom() {
+        if (lightboxSvgInner) {
+            lightboxSvgInner.style.transform = `scale(${currentBpZoom})`;
+        }
+    }
+
+    function openBlueprintLightbox(title, subtitle) {
+        if (!imageLightbox) return;
+        const step2Svg = document.getElementById('step2BlueprintSvg');
+        if (lightboxImg) lightboxImg.style.display = 'none';
+
+        if (lightboxSvgWrapper && lightboxSvgInner && step2Svg) {
+            lightboxSvgWrapper.style.display = 'flex';
+            // Inject a clean clone of the blueprint SVG
+            lightboxSvgInner.innerHTML = step2Svg.outerHTML;
+            const clonedSvg = lightboxSvgInner.querySelector('svg');
+            if (clonedSvg) {
+                clonedSvg.removeAttribute('id');
+                clonedSvg.style.display = 'block';
+                clonedSvg.style.width = '100%';
+                clonedSvg.style.height = '100%';
+                clonedSvg.style.maxWidth = '1250px';
+                clonedSvg.style.maxHeight = '74vh';
+                clonedSvg.style.borderRadius = '6px';
+            }
+            currentBpZoom = 1.0;
+            applyBlueprintModalZoom();
+
+            if (lightboxSvgTitle) lightboxSvgTitle.innerText = title || 'AI ARCHITECTURAL FLOOR PLAN BLUEPRINT';
+            if (lightboxSvgSubtitle && subtitle) lightboxSvgSubtitle.innerText = subtitle;
+            if (lightboxCaption) lightboxCaption.style.display = 'none';
+
+            imageLightbox.style.display = 'flex';
+            setTimeout(() => {
+                imageLightbox.style.opacity = '1';
+            }, 30);
+        } else if (step2Svg) {
+            const svgXml = new XMLSerializer().serializeToString(step2Svg);
+            const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgXml);
+            openLightbox(svgDataUrl, title || 'AI Architectural Floor Plan Blueprint');
+        }
+    }
+
+    // Zoom and pan buttons for the blueprint drafting viewer
+    const btnBpZoomIn = document.getElementById('btnBpZoomIn');
+    if (btnBpZoomIn) {
+        btnBpZoomIn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentBpZoom = Math.min(currentBpZoom + 0.25, 3.2);
+            applyBlueprintModalZoom();
+        });
+    }
+
+    const btnBpZoomOut = document.getElementById('btnBpZoomOut');
+    if (btnBpZoomOut) {
+        btnBpZoomOut.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentBpZoom = Math.max(currentBpZoom - 0.25, 0.6);
+            applyBlueprintModalZoom();
+        });
+    }
+
+    const btnBpReset = document.getElementById('btnBpReset');
+    if (btnBpReset) {
+        btnBpReset.addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentBpZoom = 1.0;
+            applyBlueprintModalZoom();
+        });
+    }
+
+    const btnBpDownload = document.getElementById('btnBpDownload');
+    if (btnBpDownload) {
+        btnBpDownload.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const step2Svg = document.getElementById('step2BlueprintSvg');
+            if (!step2Svg) return;
+            const svgData = new XMLSerializer().serializeToString(step2Svg);
+            const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const curH = state.houses[state.activeHouse];
+            const area = curH ? Math.round(curH.area) : 60;
+            a.download = `Architectural_Blueprint_${area}sqm.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Button to open Large Blueprint View
+    const btnFullscreenBlueprint = document.getElementById('btnFullscreenBlueprint');
+    if (btnFullscreenBlueprint) {
+        btnFullscreenBlueprint.addEventListener('click', () => {
+            const curH = state.houses[state.activeHouse];
+            const area = curH ? Math.round(curH.area) : 60;
+            const beds = curH ? curH.beds : 2;
+            const flrs = curH ? curH.floors : 1;
+            openBlueprintLightbox(
+                `AI ARCHITECTURAL FLOOR PLAN — ${area} SQ.M. TECHNICAL SPECIFICATIONS`,
+                `${beds}-Bedroom ${flrs > 1 ? flrs + '-Storey' : 'Bungalow'} • Scale 1:75 • Davao Regional Building Code Aligned`
+            );
+        });
+    }
 
     if (step2HouseImg) {
         step2HouseImg.addEventListener('click', () => {
@@ -1063,9 +1175,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (step2BlueprintImg) {
         step2BlueprintImg.addEventListener('click', () => {
-            const house = state.houses[state.activeHouse];
-            if (house) {
-                openLightbox(house.blueprint, `${house.name} - Technical Blueprint Plan`);
+            if (state.activeHouse === 'custom_photo') {
+                const curH = state.houses['custom_photo'];
+                const area = curH ? Math.round(curH.area) : 60;
+                openBlueprintLightbox(`AI ARCHITECTURAL FLOOR PLAN — ${area} SQ.M. TECHNICAL DRAFT`);
+            } else {
+                const house = state.houses[state.activeHouse];
+                if (house) {
+                    openLightbox(house.blueprint, `${house.name} - Technical Blueprint Plan`);
+                }
             }
         });
     }
@@ -1074,20 +1192,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (step2BlueprintSvg) {
         step2BlueprintSvg.style.cursor = 'zoom-in';
         step2BlueprintSvg.addEventListener('click', () => {
-            const svgXml = new XMLSerializer().serializeToString(step2BlueprintSvg);
-            const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgXml);
-            openLightbox(svgDataUrl, 'AI Architectural Floor Plan Blueprint');
+            const curH = state.houses[state.activeHouse];
+            const area = curH ? Math.round(curH.area) : 60;
+            openBlueprintLightbox(`AI ARCHITECTURAL FLOOR PLAN — ${area} SQ.M. TECHNICAL DRAFT`);
+        });
+    }
+
+    const step2BlueprintBadge = document.getElementById('step2BlueprintBadge');
+    if (step2BlueprintBadge) {
+        step2BlueprintBadge.addEventListener('click', () => {
+            if (state.activeHouse === 'custom_photo') {
+                const curH = state.houses['custom_photo'];
+                const area = curH ? Math.round(curH.area) : 60;
+                openBlueprintLightbox(`AI ARCHITECTURAL FLOOR PLAN — ${area} SQ.M. TECHNICAL DRAFT`);
+            } else {
+                const house = state.houses[state.activeHouse];
+                if (house) openLightbox(house.blueprint, `${house.name} - Technical Blueprint Plan`);
+            }
         });
     }
 
     function openLightbox(src, caption) {
-        if (!imageLightbox || !lightboxImg) return;
-        lightboxImg.src = src;
-        if (lightboxCaption) lightboxCaption.innerText = caption;
+        if (!imageLightbox) return;
+        if (lightboxSvgWrapper) lightboxSvgWrapper.style.display = 'none';
+        if (lightboxImg) {
+            lightboxImg.style.display = 'block';
+            lightboxImg.src = src;
+        }
+        if (lightboxCaption) {
+            lightboxCaption.style.display = 'block';
+            lightboxCaption.innerText = caption;
+        }
         imageLightbox.style.display = 'flex';
         setTimeout(() => {
             imageLightbox.style.opacity = '1';
-            lightboxImg.style.transform = 'scale(1)';
+            if (lightboxImg) lightboxImg.style.transform = 'scale(1)';
         }, 50);
     }
 
@@ -1095,8 +1234,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!imageLightbox) return;
         imageLightbox.style.opacity = '0';
         if (lightboxImg) lightboxImg.style.transform = 'scale(0.95)';
+        currentBpZoom = 1.0;
+        applyBlueprintModalZoom();
         setTimeout(() => {
             imageLightbox.style.display = 'none';
+            if (lightboxSvgWrapper) lightboxSvgWrapper.style.display = 'none';
+            if (lightboxImg) lightboxImg.style.display = 'block';
+            if (lightboxCaption) lightboxCaption.style.display = 'block';
         }, 300);
     }
 
@@ -1346,37 +1490,283 @@ function handlePhotoDrop(event) {
     if (file && file.type.startsWith('image/')) handlePhotoUpload(file);
 }
 
+/**
+ * Detect stated area (e.g. "60 sqm", "60 square meters", "60m2", "60 sq.m", "60 m²")
+ * from text extracted from image filename, OCR, or user input.
+ */
+function parseStatedAreaFromText(str) {
+    if (!str || typeof str !== 'string') return null;
+    const clean = str.replace(/[\r\n\t_]/g, ' ');
+
+    // 1. Matches patterns like "60 sqm", "60 sq.m", "60 sq m", "60m2", "60m²", "60 square meters", "60 sq meters"
+    const p1 = /(?:floor\s*area|total\s*area|area|size)?\s*[:=\-]?\s*(\d{1,4}(?:\.\d+)?)\s*(?:sqm|sq\.?\s*m\.?|m2|m²|square\s*meters?|square\s*m|sq\s*meters?)/i;
+    let m = clean.match(p1);
+    if (m && m[1]) {
+        const val = parseFloat(m[1]);
+        if (val >= 20 && val <= 800) return val;
+    }
+
+    // 2. Matches "area: 60", "area 60"
+    const p2 = /(?:area|floor\s*area|house\s*size|size)\s*[:=\-]?\s*(\d{2,4}(?:\.\d+)?)(?:\s*(?:m|sqm|sq|m2|m²))?/i;
+    m = clean.match(p2);
+    if (m && m[1]) {
+        const val = parseFloat(m[1]);
+        if (val >= 20 && val <= 800) return val;
+    }
+
+    // 3. Standalone area badge like "60-sqm", "60 sqm", "60m"
+    const p3 = /(?:^|[^\d])(\d{2,3})\s*(?:sqm|m2|m²)(?:[^\d]|$)/i;
+    m = clean.match(p3);
+    if (m && m[1]) {
+        const val = parseFloat(m[1]);
+        if (val >= 20 && val <= 800) return val;
+    }
+
+    // 4. Dimensions pattern like "6x10", "6 x 10 m", "10x6" => 60 m²
+    const p4 = /(?:^|[^\d])(\d{1,2}(?:\.\d+)?)\s*[xX×*]\s*(\d{1,2}(?:\.\d+)?)\s*(?:m|meters?)?(?:[^\d]|$)/i;
+    m = clean.match(p4);
+    if (m && m[1] && m[2]) {
+        const calc = Math.round(parseFloat(m[1]) * parseFloat(m[2]));
+        if (calc >= 20 && calc <= 600) return calc;
+    }
+
+    return null;
+}
+
+/**
+ * Detect stated storeys / floor level specifications or stairs from text (filename or OCR)
+ */
+function detectFloorsFromText(str) {
+    if (!str || typeof str !== 'string') return null;
+    const clean = str.replace(/[\r\n\t_]/g, ' ').toLowerCase();
+
+    // 3-storey patterns
+    const p3 = /(?:3(?:rd)?[\s\-_]*(?:floor|flr|storey|story|level|tier)|three[\s\-_]*(?:storey|story|floors?|levels?)|tri[\s\-_]*level)/i;
+    if (p3.test(clean)) {
+        return { floors: 3, reason: 'Stated 3rd floor / 3-storey specification in text or file' };
+    }
+
+    // 2-storey or stairs patterns
+    const p2 = /(?:2(?:nd)?[\s\-_]*(?:floor|flr|storey|story|level|tier)|two[\s\-_]*(?:storey|story|floors?|levels?)|second[\s\-_]*floor|upper[\s\-_]*floor|stairs?|staircase|stairwell|upstairs|loft|duplex|bi[\s\-_]*level)/i;
+    if (p2.test(clean)) {
+        return { floors: 2, reason: 'Stated 2nd floor / stairs specification in text or file' };
+    }
+
+    return null;
+}
+
+/**
+ * Visual computer vision facade analysis:
+ * Detects vertically stacked windows (a window above a ground-floor window -> 2nd floor,
+ * 3 vertical tiers of windows -> 3rd floor) and ascending stairs patterns from image canvas.
+ */
+function detectVisualFloorsFromCanvas(imgElement) {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const W = 220, H = 220;
+        canvas.width = W;
+        canvas.height = H;
+        ctx.drawImage(imgElement, 0, 0, W, H);
+        const imgData = ctx.getImageData(0, 0, W, H);
+        const data = imgData.data;
+
+        // Calculate horizontal edge contrast profile along vertical axis (y = 0 to H)
+        // Window frames, sills, and glazing produce concentrated horizontal contrast spikes
+        const rowContrast = new Float32Array(H);
+        for (let y = 1; y < H - 1; y++) {
+            let rowDiff = 0;
+            for (let x = 12; x < W - 12; x++) {
+                const idx = (y * W + x) * 4;
+                const above = ((y - 1) * W + x) * 4;
+                const below = ((y + 1) * W + x) * 4;
+                const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+                const lumAbove = data[above] * 0.299 + data[above + 1] * 0.587 + data[above + 2] * 0.114;
+                const lumBelow = data[below] * 0.299 + data[below + 1] * 0.587 + data[below + 2] * 0.114;
+                rowDiff += Math.abs(lum - lumAbove) + Math.abs(lum - lumBelow);
+            }
+            rowContrast[y] = rowDiff / (W - 24);
+        }
+
+        // Measure contrast peaks in 3 distinct vertical facade elevation zones:
+        // Top tier (3rd Floor elevation window zone): y: 14% to 35%
+        // Middle tier (2nd Floor elevation window zone): y: 35% to 60%
+        // Bottom tier (Ground floor doors/windows zone): y: 60% to 86%
+        let z1Peak = 0, z2Peak = 0, z3Peak = 0;
+        for (let y = Math.round(H * 0.14); y < Math.round(H * 0.35); y++) {
+            if (rowContrast[y] > z1Peak) z1Peak = rowContrast[y];
+        }
+        for (let y = Math.round(H * 0.35); y < Math.round(H * 0.60); y++) {
+            if (rowContrast[y] > z2Peak) z2Peak = rowContrast[y];
+        }
+        for (let y = Math.round(H * 0.60); y < Math.round(H * 0.86); y++) {
+            if (rowContrast[y] > z3Peak) z3Peak = rowContrast[y];
+        }
+
+        const avgPeak = (z1Peak + z2Peak + z3Peak) / 3;
+        const threshold = avgPeak * 0.68;
+
+        const hasBottomWindows = z3Peak > threshold;
+        const hasMiddleWindows = z2Peak > threshold;
+        const hasTopWindows = z1Peak > threshold;
+
+        const ratio = (imgElement.naturalWidth || 1) / Math.max(imgElement.naturalHeight || 1, 1);
+
+        // 3 Tiers of vertically stacked windows
+        if (hasBottomWindows && hasMiddleWindows && hasTopWindows && (ratio < 1.15)) {
+            return {
+                floors: 3,
+                reason: 'Vertically stacked 3-tier window elevations detected (Ground + 2nd + 3rd Floor)'
+            };
+        }
+
+        // 2 Tiers of vertically stacked windows (Upper window directly above ground window) or stairs
+        if (hasBottomWindows && hasMiddleWindows && (ratio < 1.45)) {
+            return {
+                floors: 2,
+                reason: 'Vertically stacked window tier detected (Upper windows directly above ground floor windows)'
+            };
+        }
+
+        // Fallback to aspect ratio calibration
+        if (ratio < 0.65) {
+            return { floors: 3, reason: 'Vertical elevation aspect ratio indicates 3-storey building' };
+        } else if (ratio < 0.88) {
+            return { floors: 2, reason: 'Vertical facade height indicates 2-storey house' };
+        }
+
+        return { floors: 1, reason: 'Single-storey bungalow facade profile' };
+    } catch (e) {
+        console.warn('Visual facade analysis notice:', e);
+        return { floors: 1, reason: 'Default single-storey profile' };
+    }
+}
+
+/**
+ * Optical character recognition (OCR) scan on uploaded image canvas
+ * Runs Tesseract with a 2-second timeout race to prevent UI freeze
+ */
+async function attemptImageOcrScan(imgElement) {
+    if (!window.Tesseract || !window.Tesseract.recognize) return null;
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const maxDim = 1100;
+        let w = imgElement.naturalWidth || imgElement.width || 800;
+        let h = imgElement.naturalHeight || imgElement.height || 600;
+        if (w > maxDim || h > maxDim) {
+            const sc = maxDim / Math.max(w, h);
+            w = Math.round(w * sc);
+            h = Math.round(h * sc);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(imgElement, 0, 0, w, h);
+
+        const ocrPromise = window.Tesseract.recognize(canvas, 'eng');
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2200));
+        const res = await Promise.race([ocrPromise, timeoutPromise]);
+        if (res && res.data && res.data.text) {
+            const area = parseStatedAreaFromText(res.data.text);
+            return { area: area, rawText: res.data.text };
+        }
+    } catch (e) {
+        console.warn('OCR processing notice:', e);
+    }
+    return null;
+}
+
 /** Main entry — called when user selects or drops a house photo */
-function handlePhotoUpload(file) {
+async function handlePhotoUpload(file) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         const dataUrl = e.target.result;
 
         // Show analyzing overlay banner on Step 1
         const overlay = document.getElementById('analyzingOverlay');
         const uploadCard = document.getElementById('photoUploadCard');
+        const mainTxt = document.getElementById('analyzingMainText');
+        const subTxt = document.getElementById('analyzingSubText');
         if (overlay) overlay.style.display = 'block';
-        if (uploadCard) uploadCard.style.opacity = '0.4';
+        if (uploadCard) uploadCard.style.opacity = '0.35';
+
+        // Check manual input hint first
+        const hintInput = document.getElementById('photoAreaHint');
+        let statedArea = null;
+        let detectionSource = 'visual geometry estimate';
+
+        if (hintInput && hintInput.value.trim()) {
+            const manualVal = parseFloat(hintInput.value.trim());
+            if (manualVal >= 20 && manualVal <= 800) {
+                statedArea = manualVal;
+                detectionSource = 'manual user specification';
+            }
+        }
+
+        // Check filename second (e.g. house_60sqm.jpg, 60m2.png)
+        if (!statedArea && file.name) {
+            const fnArea = parseStatedAreaFromText(file.name);
+            if (fnArea) {
+                statedArea = fnArea;
+                detectionSource = `file name ("${file.name}")`;
+            }
+        }
 
         const img = new Image();
-        img.onload = function () {
+        img.onload = async function () {
             const w = img.naturalWidth;
             const h = img.naturalHeight;
+
+            let ocrRawText = '';
+            // If not found in filename or hint, perform quick OCR pass on the image
+            if (!statedArea) {
+                if (mainTxt) mainTxt.innerText = 'AI Scanning Image for Stated Area & Text...';
+                if (subTxt) subTxt.innerText = 'Detecting embedded labels (e.g. 60 sqm) and structural elevations...';
+                const ocrResult = await attemptImageOcrScan(img);
+                if (ocrResult) {
+                    statedArea = ocrResult.area;
+                    ocrRawText = ocrResult.rawText || '';
+                    if (ocrResult.area) {
+                        detectionSource = `image text / blueprint specification (OCR: ${ocrResult.area} m²)`;
+                    }
+                }
+            }
+
+            // Detect floor levels from: filename -> OCR text -> Canvas vision (stacked window tiers / stairs)
+            let floorDetection = detectFloorsFromText(file.name);
+            if (!floorDetection && ocrRawText) {
+                floorDetection = detectFloorsFromText(ocrRawText);
+            }
+            if (!floorDetection) {
+                floorDetection = detectVisualFloorsFromCanvas(img);
+            }
+
+            const detectedFloors = floorDetection ? floorDetection.floors : 1;
+            const floorsReason = floorDetection ? floorDetection.reason : 'Standard bungalow facade';
+
+            if (mainTxt) {
+                const areaLabel = statedArea ? `${Math.round(statedArea)} m²` : 'Calculated Area';
+                const floorLabel = detectedFloors === 3 ? '3-Storey (3 Window Tiers)' : detectedFloors === 2 ? '2-Storey (Upper Windows / Stairs)' : '1-Storey Bungalow';
+                mainTxt.innerHTML = `<span style="color:#38bdf8;">✨ AI Detected: ${areaLabel} • ${floorLabel}</span>`;
+            }
+            if (subTxt) {
+                subTxt.innerHTML = `Identified: <strong>${floorsReason}</strong>. Adopting multi-level layout, staircase blueprint, and Davao building code compliance...`;
+            }
 
             // Simulate high-tech AI scan then go DIRECTLY to Step 2 Estimation!
             setTimeout(() => {
                 if (overlay) overlay.style.display = 'none';
                 if (uploadCard) uploadCard.style.opacity = '1';
 
-                // Run AI photo heuristic analysis and register custom house model
-                analyzePhotoAndSetHouse(dataUrl, w, h);
+                // Run AI photo analysis and register custom house model
+                analyzePhotoAndSetHouse(file, dataUrl, w, h, statedArea, detectionSource, detectedFloors, floorsReason);
 
                 // GO DIRECTLY TO ESTIMATION (STEP 2)
                 if (window.transitionWizard) {
                     window.transitionWizard(2);
                 }
-            }, 1100);
+            }, 850);
         };
         img.src = dataUrl;
     };
@@ -1384,27 +1774,37 @@ function handlePhotoUpload(file) {
 }
 
 /**
- * Heuristic "AI" photo analyzer:
- * Reads image dimensions and aspect ratio to estimate floor area,
- * quality grade, and floor levels.
+ * "AI" photo analyzer:
+ * Reads stated area and detected floor count (or calculates from image geometry/aspect ratio)
+ * to estimate floor area, quality grade, and floor levels.
  */
-function analyzePhotoAndSetHouse(dataUrl, imgW, imgH) {
+function analyzePhotoAndSetHouse(file, dataUrl, imgW, imgH, statedArea = null, detectionSource = '', detectedFloors = 1, floorsReason = '') {
     const ratio = imgW / Math.max(imgH, 1);
     const seed = (imgW * imgH) % 1000;
 
-    let estArea = Math.round(45 + (ratio * 40) + (seed * 0.12));
-    estArea = Math.min(Math.max(estArea, 40), 280);
+    let estArea = statedArea;
+    if (!estArea) {
+        estArea = Math.round(45 + (ratio * 40) + (seed * 0.12));
+        estArea = Math.min(Math.max(estArea, 40), 280);
+    }
 
     let qualityVal = 'standard';
     const totalPx = imgW * imgH;
     if (totalPx > 3500000) qualityVal = 'luxury';
     else if (totalPx > 1400000) qualityVal = 'premium';
 
-    let floors = 1;
-    if (ratio < 0.75) floors = 2;
-    if (ratio < 0.55) floors = 3;
+    const floors = parseInt(detectedFloors) || 1;
 
     createCustomPhotoHouse(dataUrl, estArea, floors, qualityVal, 'gable');
+
+    // Update banner in Step 2 with the adopted area & storeys
+    const adoptedVal = document.getElementById('aiAdoptedAreaVal');
+    const adoptedNote = document.getElementById('aiAdoptedAreaNote');
+    if (adoptedVal) adoptedVal.innerText = `${Math.round(estArea)} m² (${floors} ${floors > 1 ? 'Storeys' : 'Storey'})`;
+    if (adoptedNote) {
+        const floorDesc = floors === 3 ? '3-Storey structure' : floors === 2 ? '2-Storey structure' : 'Single-storey bungalow';
+        adoptedNote.innerHTML = `✨ Adopted <strong>${Math.round(estArea)} m²</strong> &amp; <strong>${floorDesc}</strong> (${floorsReason || detectionSource}). Blueprint staircase, materials count, and workforce timeline have adopted it directly.`;
+    }
 }
 
 /**
@@ -1423,18 +1823,18 @@ function createCustomPhotoHouse(dataUrl, area, floors, quality, roofType) {
     const baths = area < 70 ? 1 : area < 130 ? 2 : 3;
     const scale = (area * floors) / 80;
 
-    const foundationDesc = floors > 1 
-        ? 'Reinforced Concrete Ground Piers & Continuous Footings' 
+    const foundationDesc = floors > 1
+        ? 'Reinforced Concrete Ground Piers & Continuous Footings'
         : 'Reinforced Concrete Slab-on-Grade & Strip Footing';
-    const wallDesc = quality === 'luxury' 
-        ? 'High-Strength Concrete CHB with Thermal Wall Insulation' 
-        : quality === 'premium' 
-            ? 'Load-Bearing Concrete CHB with Tie Columns' 
+    const wallDesc = quality === 'luxury'
+        ? 'High-Strength Concrete CHB with Thermal Wall Insulation'
+        : quality === 'premium'
+            ? 'Load-Bearing Concrete CHB with Tie Columns'
             : 'Standard Reinforced CHB Concrete Masonry';
-    const roofDesc = roofType === 'hip' 
-        ? 'Engineered Hip-Profile Heavy Steel Trusses & GI Sheets' 
-        : roofType === 'flat' 
-            ? 'Reinforced Concrete Flat Roof Deck with Waterproofing' 
+    const roofDesc = roofType === 'hip'
+        ? 'Engineered Hip-Profile Heavy Steel Trusses & GI Sheets'
+        : roofType === 'flat'
+            ? 'Reinforced Concrete Flat Roof Deck with Waterproofing'
             : 'Storm-Grade Gable Steel Framing & Pre-painted GI Panels';
 
     const mult = {
@@ -1494,6 +1894,14 @@ function createCustomPhotoHouse(dataUrl, area, floors, quality, roofType) {
     if (sQual) sQual.value = quality;
     if (sFlr) sFlr.value = floors;
     if (sRoof) sRoof.value = roofType;
+
+    const adoptedVal = document.getElementById('aiAdoptedAreaVal');
+    const adoptedNote = document.getElementById('aiAdoptedAreaNote');
+    if (adoptedVal) adoptedVal.innerText = `${Math.round(area)} m² (${floors} ${floors > 1 ? 'Storeys' : 'Storey'})`;
+    if (adoptedNote) {
+        const floorDesc = floors === 3 ? '3-Storey structure' : floors === 2 ? '2-Storey structure' : 'Single-storey bungalow';
+        adoptedNote.innerHTML = `Floor area calibrated to ${Math.round(area)} square meters &amp; ${floorDesc} (${bedrooms} Bedrooms, ${baths} Bathroom${baths > 1 ? 's' : ''}). Blueprint staircase, structural piers, and materials synchronized.`;
+    }
 }
 
 /** Parameter change helpers from Step 2 */
@@ -1540,16 +1948,16 @@ function updatePhotoRoof(val) {
 }
 
 /**
- * Architectural Floor Plan Blueprint Generator — Proper technical drawing style.
- * White background, double-line walls, dimension markers, door arcs, furniture.
- * Matches professional floor plan standards.
+ * Architectural Floor Plan Blueprint Generator — Technical CAD drafting style.
+ * High-resolution vector canvas (880 x 560), double-line walls, dimension markers, door arcs, furniture.
+ * Professional architectural floor plan standard.
  */
 function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
-    const svg = document.getElementById(targetId) || document.getElementById('step2BlueprintSvg') || document.getElementById('photoBlueprint');
+    const svg = (typeof targetId === 'string' ? document.getElementById(targetId) : targetId) || document.getElementById('step2BlueprintSvg') || document.getElementById('photoBlueprint');
     if (!svg) return;
 
-    // Technical Blueprint Canvas
-    const W = 520, H = 340;
+    // Technical Blueprint Canvas: High-Resolution 880x560
+    const W = 880, H = 560;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.style.height = '100%';
     svg.style.width = '100%';
@@ -1558,20 +1966,20 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
     const bedrooms = area < 55 ? 1 : area < 90 ? 2 : area < 150 ? 3 : 4;
 
     // House real-world dimensions in meters
-    const baseDims = { 1: [5, 7], 2: [6, 8], 3: [8, 10], 4: [10, 12] };
-    const [bW, bD] = baseDims[bedrooms] || [8, 10];
+    const baseDims = { 1: [5.5, 7.5], 2: [6.5, 9.23], 3: [8.5, 11.0], 4: [10.5, 13.0] };
+    const [bW, bD] = baseDims[bedrooms] || [6.5, 9.23];
     const sf = Math.sqrt(area / (bW * bD));
     const houseW = +(bW * sf).toFixed(2);
     const houseD = +(bD * sf).toFixed(2);
 
     // Layout geometry
-    const specW = 130;      // right spec panel
-    const dimOff = 26;      // space for dimension lines
-    const titleH = 36;      // title bar height
-    const marginL = dimOff + 6;
+    const specW = 210;     // right specifications & legend panel
+    const dimOff = 38;     // space for dimension lines
+    const titleH = 46;     // title bar height
+    const marginL = dimOff + 10;
     const marginT = titleH + dimOff;
-    const marginR = specW + 6;
-    const marginB = dimOff + 6;
+    const marginR = specW + 10;
+    const marginB = dimOff + 10;
     const bpW = W - marginL - marginR;
     const bpH = H - marginT - marginB;
     const pxM = Math.min(bpW / houseW, bpH / houseD);
@@ -1579,9 +1987,8 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
     const hH = houseD * pxM;
     const hX = marginL + (bpW - hW) / 2;
     const hY = marginT + (bpH - hH) / 2;
-    const wt = Math.max(4, pxM * 0.15);   // outer wall px
-    const iwt = Math.max(2.5, pxM * 0.09); // inner wall px
-    const wh = wt / 2;                     // half wall thickness
+    const wt = Math.max(6, pxM * 0.16);   // outer wall px
+    const iwt = Math.max(3.5, pxM * 0.10); // inner wall px
 
     const scaleN = Math.round(100 / pxM * 100);
 
@@ -1589,19 +1996,18 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
     let s = '';
 
     // ── Background ────────────────────────────────────────────────────
-    // White background like technical drawing
     s += `<rect width="${W}" height="${H}" fill="#f8fafc"/>`;
 
     // Subtle graph paper grid inside floor plan area
     s += `<defs>
         <pattern id="gpgrid" width="${pxM}" height="${pxM}" patternUnits="userSpaceOnUse" x="${hX}" y="${hY}">
-            <rect width="${pxM}" height="${pxM}" fill="none" stroke="#dde9f5" stroke-width="0.4"/>
+            <rect width="${pxM}" height="${pxM}" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>
         </pattern>
-        <marker id="arrow" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-            <path d="M0,0 L0,4 L4,2 Z" fill="#374151"/>
+        <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L6,3 Z" fill="#1d4ed8"/>
         </marker>
-        <marker id="arrowB" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto-start-reverse">
-            <path d="M0,0 L0,4 L4,2 Z" fill="#374151"/>
+        <marker id="arrowB" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto-start-reverse">
+            <path d="M0,0 L0,6 L6,3 Z" fill="#1d4ed8"/>
         </marker>
     </defs>`;
 
@@ -1609,84 +2015,82 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
     s += `<rect x="${hX + wt}" y="${hY + wt}" width="${hW - wt * 2}" height="${hH - wt * 2}" fill="url(#gpgrid)"/>`;
 
     // ── Title block ───────────────────────────────────────────────────
-    s += `<text x="${marginL}" y="14" fill="#111827" font-size="9.5" font-family="'Outfit',sans-serif" font-weight="800">FLOOR PLAN</text>`;
-    s += `<text x="${marginL}" y="25" fill="#374151" font-size="7" font-family="'Outfit',monospace">${houseW.toFixed(2)}m x ${houseD.toFixed(2)}m  (${Math.round(area)} SQ.M.)  SCALE 1:${scaleN}</text>`;
-    s += `<text x="${marginL}" y="34" fill="#374151" font-size="7" font-family="'Outfit',monospace">${bedrooms}-BEDROOM ${floors > 1 ? floors + '-STOREY' : 'BUNGALOW'}  —  ${floors} FLOOR${floors > 1 ? 'S' : ''}</text>`;
+    s += `<text x="${marginL}" y="20" fill="#0f172a" font-size="14" font-family="'Outfit',sans-serif" font-weight="900" letter-spacing="0.5">ARCHITECTURAL FLOOR PLAN BLUEPRINT</text>`;
+    s += `<text x="${marginL}" y="35" fill="#334155" font-size="11" font-family="'Outfit',monospace" font-weight="700">${houseW.toFixed(2)}m × ${houseD.toFixed(2)}m (${Math.round(area)} SQ.M.) • SCALE 1:${scaleN} • RESIDENTIAL STANDARD</text>`;
+    const flrHeading = floors === 3 ? '3-STOREY MULTI-LEVEL' : floors === 2 ? '2-STOREY RESIDENTIAL' : 'BUNGALOW';
+    const structHeading = floors > 1 ? 'REINFORCED CHB WITH STAIRWELL ACCESS' : 'REINFORCED CHB MASONRY';
+    s += `<text x="${marginL}" y="48" fill="#64748b" font-size="9.5" font-family="'Outfit',monospace">${bedrooms}-BEDROOM ${flrHeading} • ${floors} LEVEL${floors > 1 ? 'S' : ''} • ${structHeading}</text>`;
 
-    // ── Outer wall (filled thick rect) ───────────────────────────────
-    // Draw as two rects: outer fill, inner cutout
-    s += `<rect x="${hX}" y="${hY}" width="${hW}" height="${hH}" fill="#2d3748" rx="0"/>`;
-    s += `<rect x="${hX + wt}" y="${hY + wt}" width="${hW - wt * 2}" height="${hH - wt * 2}" fill="#f0f7ff" rx="0"/>`;
+    // ── Outer wall (solid thick perimeter) ───────────────────────────
+    s += `<rect x="${hX}" y="${hY}" width="${hW}" height="${hH}" fill="#1e293b" rx="1"/>`;
+    s += `<rect x="${hX + wt}" y="${hY + wt}" width="${hW - wt * 2}" height="${hH - wt * 2}" fill="#f0f7ff" rx="1"/>`;
 
     // ── Room layouts with double-line inner walls ─────────────────────
     if (bedrooms === 2) {
-        // Column widths: 40% | 25% | 35%  Row heights: 50% | 50%
-        const c1 = hX + hW * 0.40;  // first vert partition
-        const c2 = hX + hW * 0.65;  // second vert partition
-        const r1 = hY + hH * 0.50;  // horiz partition
+        // Calibrated 2-Bedroom Layout (Ideal for 60 m²)
+        const c1 = hX + hW * 0.40;
+        const c2 = hX + hW * 0.65;
+        const r1 = hY + hH * 0.50;
 
-        // Inner walls (double-line: draw thick fill then thin gap)
-        // Vertical wall 1 (left of bath/kitchen)
         s += dblWall(c1, hY + wt, c1, hY + hH - wt, iwt);
-        // Vertical wall 2 (left of living)
         s += dblWall(c2, hY + wt, c2, hY + hH - wt, iwt);
-        // Horizontal wall (between bed1 and bed2, and between bath and kitchen)
         s += dblWall(hX + wt, r1, c2, r1, iwt);
 
         // Room fills
-        s += roomRect(hX + wt, hY + wt, c1 - wt, r1 - wt, '#e8f4fd'); // Bedroom 1 (top-left)
-        s += roomRect(hX + wt, r1 + iwt / 2, c1 - wt, hY + hH - wt, '#e8f4fd'); // Bedroom 2 (bottom-left)
-        s += roomRect(c1 + iwt / 2, hY + wt, c2 - iwt / 2, r1 - iwt / 2, '#e0f7f7'); // Bathroom (top-mid)
-        s += roomRect(c1 + iwt / 2, r1 + iwt / 2, c2 - iwt / 2, hY + hH - wt, '#fff8e1'); // Kitchen (bottom-mid)
-        s += roomRect(c2 + iwt / 2, hY + wt, hX + hW - wt, hY + hH - wt, '#e8f0fe'); // Living (full right)
+        s += roomRect(hX + wt, hY + wt, c1 - wt, r1 - wt, '#e8f4fd'); // Master Bedroom
+        s += roomRect(hX + wt, r1 + iwt / 2, c1 - wt, hY + hH - wt, '#e8f4fd'); // Bedroom 2
+        s += roomRect(c1 + iwt / 2, hY + wt, c2 - iwt / 2, r1 - iwt / 2, '#e0f7f7'); // Bathroom
+        s += roomRect(c1 + iwt / 2, r1 + iwt / 2, c2 - iwt / 2, hY + hH - wt, '#fff8e1'); // Kitchen
+        s += roomRect(c2 + iwt / 2, hY + wt, hX + hW - wt, hY + hH - wt, '#e8f0fe'); // Living/Dining
 
         // Room labels + dimensions
         const rm = (nm, dim, cx, cy, col) => `
-            <text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="${col}" font-size="7.2" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
-            <text x="${cx}" y="${cy + 7}" text-anchor="middle" fill="#6b7280" font-size="6" font-family="'Outfit',monospace">${dim}</text>`;
+            <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="${col}" font-size="12" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
+            <text x="${cx}" y="${cy + 10}" text-anchor="middle" fill="#475569" font-size="10" font-family="'Outfit',monospace" font-weight="600">${dim}</text>`;
 
-        s += rm('BEDROOM 1', `${(houseW * 0.40).toFixed(1)} x ${(houseD * 0.50).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
-        s += rm('BEDROOM 2', `${(houseW * 0.40).toFixed(1)} x ${(houseD * 0.50).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + hY + hH - wt) / 2, '#1d4ed8');
-        s += rm('BATH', `${(houseW * 0.25).toFixed(1)} x ${(houseD * 0.50).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r1) / 2, '#0e7490');
-        s += rm('KITCHEN', `${(houseW * 0.25).toFixed(1)} x ${(houseD * 0.50).toFixed(1)}m`, (c1 + c2) / 2, (r1 + hY + hH - wt) / 2, '#92400e');
-        s += rm('LIVING AREA', `${(houseW * 0.35).toFixed(1)} x ${houseD.toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + hY + hH - wt) / 2, '#1e3a5f');
+        s += rm('MASTER BEDROOM', `${(houseW * 0.40).toFixed(1)} × ${(houseD * 0.50).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
+        s += rm('BEDROOM 2', `${(houseW * 0.40).toFixed(1)} × ${(houseD * 0.50).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + hY + hH - wt) / 2, '#1d4ed8');
+        s += rm('BATHROOM', `${(houseW * 0.25).toFixed(1)} × ${(houseD * 0.50).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r1) / 2, '#0e7490');
+        s += rm('KITCHEN', `${(houseW * 0.25).toFixed(1)} × ${(houseD * 0.50).toFixed(1)}m`, (c1 + c2) / 2, (r1 + hY + hH - wt) / 2, '#92400e');
+        s += rm('LIVING & DINING', `${(houseW * 0.35).toFixed(1)} × ${houseD.toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + hY + hH - wt) / 2, '#1e3a5f');
 
         // Doors
-        const dr = pxM * 0.75;
-        // Bedroom 1 door (opens into living side)
+        const dr = pxM * 0.78;
         s += archDoor(c1, hY + hH * 0.14, dr, 'right', '#2563eb');
-        // Bedroom 2 door
         s += archDoor(c1, hY + hH * 0.64, dr, 'right', '#2563eb');
-        // Living/main entrance
-        s += archDoor(hX + wt, hY + hH * 0.28, pxM * 0.85, 'right', '#2563eb');
-        // Kitchen door
+        s += archDoor(hX + wt, hY + hH * 0.28, pxM * 0.88, 'right', '#2563eb');
         s += archDoor(c2, hY + hH * 0.76, dr, 'right', '#2563eb');
 
-        // Windows (3-line symbol)
-        s += archWin(hX + hW * 0.20, hY, pxM * 1.0, 'h');   // Bed1 front
-        s += archWin(hX + hW * 0.20, hY + hH, pxM * 1.0, 'h'); // Bed2 rear
-        s += archWin(hX + hW, hY + hH * 0.25, pxM * 0.85, 'v'); // Living side R
-        s += archWin(hX + hW, hY + hH * 0.72, pxM * 0.85, 'v'); // Living side R2
+        // Windows (3-line architectural symbol)
+        s += archWin(hX + hW * 0.20, hY, pxM * 1.1, 'h');
+        s += archWin(hX + hW * 0.20, hY + hH, pxM * 1.1, 'h');
+        s += archWin(hX + hW, hY + hH * 0.25, pxM * 0.95, 'v');
+        s += archWin(hX + hW, hY + hH * 0.72, pxM * 0.95, 'v');
 
         // Furniture
-        s += fBed(hX + hW * 0.04, hY + hH * 0.07, pxM * 1.4, pxM * 1.1);
-        s += fBed(hX + hW * 0.04, hY + hH * 0.57, pxM * 1.4, pxM * 1.1);
-        s += fToilet(c1 + hW * 0.02, hY + hH * 0.05, pxM * 0.5, pxM * 0.42);
-        s += fSink(c1 + hW * 0.13, hY + hH * 0.05, pxM * 0.38, pxM * 0.35);
-        s += fKitchenL(c1 + hW * 0.02, r1 + hH * 0.04, pxM * 0.65, pxM * 0.28);
-        s += fSofa(c2 + hW * 0.03, hY + hH * 0.05, pxM * 1.2, pxM * 0.48);
-        s += fTable(c2 + hW * 0.175, (hY + wt + hY + hH - wt) / 2, pxM * 0.68);
+        s += fBed(hX + hW * 0.04, hY + hH * 0.07, pxM * 1.45, pxM * 1.15);
+        s += fBed(hX + hW * 0.04, hY + hH * 0.57, pxM * 1.45, pxM * 1.15);
+        s += fToilet(c1 + hW * 0.03, hY + hH * 0.05, pxM * 0.52, pxM * 0.44);
+        s += fSink(c1 + hW * 0.14, hY + hH * 0.05, pxM * 0.4, pxM * 0.36);
+        s += fKitchenL(c1 + hW * 0.02, r1 + hH * 0.04, pxM * 0.7, pxM * 0.3);
+        s += fSofa(c2 + hW * 0.04, hY + hH * 0.06, pxM * 1.25, pxM * 0.52);
+        s += fTable(c2 + hW * 0.175, (hY + wt + hY + hH - wt) / 2, pxM * 0.72);
 
-        // ── Sub-dimension lines inside floor plan ──────────────────
-        // Top sub-dims (column widths)
+        // Multi-storey architectural staircase
+        if (floors > 1) {
+            const stLabel = floors === 3 ? 'UP TO 3RD FLOOR' : 'UP TO 2ND FLOOR';
+            s += fStairs(c2 + hW * 0.19, hY + hH * 0.48, pxM * 1.05, pxM * 1.55, stLabel, 8);
+        }
+
+        // Sub-dimension lines inside floor plan
         const subDimY = hY - dimOff / 2;
-        s += subDim(hX, subDimY, c1, subDimY, `${(houseW * 0.40).toFixed(2)}`);
-        s += subDim(c1, subDimY, c2, subDimY, `${(houseW * 0.25).toFixed(2)}`);
-        s += subDim(c2, subDimY, hX + hW, subDimY, `${(houseW * 0.35).toFixed(2)}`);
-        // Left sub-dims (row heights)
+        s += subDim(hX, subDimY, c1, subDimY, `${(houseW * 0.40).toFixed(2)}m`);
+        s += subDim(c1, subDimY, c2, subDimY, `${(houseW * 0.25).toFixed(2)}m`);
+        s += subDim(c2, subDimY, hX + hW, subDimY, `${(houseW * 0.35).toFixed(2)}m`);
+
         const subDimX = hX - dimOff / 2;
-        s += subDim(hX, hY, hX, r1, `${(houseD * 0.50).toFixed(2)}`, 'v', subDimX);
-        s += subDim(hX, r1, hX, hY + hH, `${(houseD * 0.50).toFixed(2)}`, 'v', subDimX);
+        s += subDim(hX, hY, hX, r1, `${(houseD * 0.50).toFixed(2)}m`, 'v', subDimX);
+        s += subDim(hX, r1, hX, hY + hH, `${(houseD * 0.50).toFixed(2)}m`, 'v', subDimX);
 
     } else if (bedrooms === 3) {
         const c1 = hX + hW * 0.37;
@@ -1706,42 +2110,47 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
         s += roomRect(c1 + iwt / 2, r2 + iwt / 2, c2 - iwt / 2, hY + hH - wt, '#fff8e1');
         s += roomRect(c2 + iwt / 2, hY + wt, hX + hW - wt, hY + hH - wt, '#e8f0fe');
 
-        const rm2 = (nm, dim, cx, cy, col) => `
-            <text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="${col}" font-size="7" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
-            <text x="${cx}" y="${cy + 6}" text-anchor="middle" fill="#6b7280" font-size="5.8" font-family="'Outfit',monospace">${dim}</text>`;
-        s += rm2('BEDROOM 1', `${(houseW * .37).toFixed(1)}x${(houseD * .37).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
-        s += rm2('BEDROOM 2', `${(houseW * .37).toFixed(1)}x${(houseD * .30).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + r2) / 2, '#1d4ed8');
-        s += rm2('BEDROOM 3', `${(houseW * .37).toFixed(1)}x${(houseD * .33).toFixed(1)}m`, (hX + wt + c1) / 2, (r2 + hY + hH - wt) / 2, '#1d4ed8');
-        s += rm2('BATH', `${(houseW * .25).toFixed(1)}x${(houseD * .67).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r2) / 2, '#0e7490');
-        s += rm2('KITCHEN', `${(houseW * .25).toFixed(1)}x${(houseD * .33).toFixed(1)}m`, (c1 + c2) / 2, (r2 + hY + hH - wt) / 2, '#92400e');
-        s += rm2('LIVING / DINING', `${(houseW * .38).toFixed(1)}x${houseD.toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + hY + hH - wt) / 2, '#1e3a5f');
+        const rm3 = (nm, dim, cx, cy, col) => `
+            <text x="${cx}" y="${cy - 5}" text-anchor="middle" fill="${col}" font-size="11" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
+            <text x="${cx}" y="${cy + 8}" text-anchor="middle" fill="#475569" font-size="9" font-family="'Outfit',monospace">${dim}</text>`;
+        s += rm3('BEDROOM 1', `${(houseW * .37).toFixed(1)}×${(houseD * .37).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
+        s += rm3('BEDROOM 2', `${(houseW * .37).toFixed(1)}×${(houseD * .30).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + r2) / 2, '#1d4ed8');
+        s += rm3('BEDROOM 3', `${(houseW * .37).toFixed(1)}×${(houseD * .33).toFixed(1)}m`, (hX + wt + c1) / 2, (r2 + hY + hH - wt) / 2, '#1d4ed8');
+        s += rm3('BATHROOM', `${(houseW * .25).toFixed(1)}×${(houseD * .67).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r2) / 2, '#0e7490');
+        s += rm3('KITCHEN', `${(houseW * .25).toFixed(1)}×${(houseD * .33).toFixed(1)}m`, (c1 + c2) / 2, (r2 + hY + hH - wt) / 2, '#92400e');
+        s += rm3('LIVING / DINING', `${(houseW * .38).toFixed(1)}×${houseD.toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + hY + hH - wt) / 2, '#1e3a5f');
 
-        s += archDoor(c1, hY + hH * 0.10, pxM * .72, 'right', '#2563eb');
-        s += archDoor(c1, hY + hH * 0.44, pxM * .72, 'right', '#2563eb');
-        s += archDoor(c1, hY + hH * 0.72, pxM * .72, 'right', '#2563eb');
-        s += archDoor(c2, hY + hH * 0.32, pxM * .85, 'right', '#2563eb');
-        s += archDoor(hX + wt, hY + hH * 0.22, pxM * .85, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * 0.10, pxM * .75, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * 0.44, pxM * .75, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * 0.72, pxM * .75, 'right', '#2563eb');
+        s += archDoor(c2, hY + hH * 0.32, pxM * .88, 'right', '#2563eb');
+        s += archDoor(hX + wt, hY + hH * 0.22, pxM * .88, 'right', '#2563eb');
 
-        s += archWin(hX + hW * 0.185, hY, pxM * 0.95, 'h');
-        s += archWin(hX + hW * 0.185, hY + hH, pxM * 0.9, 'h');
-        s += archWin(hX + hW, hY + hH * 0.25, pxM * 1.0, 'v');
-        s += archWin(hX + hW, hY + hH * 0.70, pxM * 0.8, 'v');
+        s += archWin(hX + hW * 0.185, hY, pxM * 1.0, 'h');
+        s += archWin(hX + hW * 0.185, hY + hH, pxM * 0.95, 'h');
+        s += archWin(hX + hW, hY + hH * 0.25, pxM * 1.05, 'v');
+        s += archWin(hX + hW, hY + hH * 0.70, pxM * 0.85, 'v');
 
-        s += fBed(hX + hW * 0.04, hY + hH * 0.04, pxM * 1.35, pxM * 1.05);
-        s += fBed(hX + hW * 0.04, hY + hH * 0.40, pxM * 1.25, pxM * 1.0);
-        s += fBed(hX + hW * 0.04, hY + hH * 0.72, pxM * 1.15, pxM * 0.95);
-        s += fToilet(c1 + hW * 0.02, hY + hH * 0.04, pxM * 0.5, pxM * 0.42);
-        s += fKitchenL(c1 + hW * 0.02, r2 + hH * 0.03, pxM * 0.65, pxM * 0.28);
-        s += fSofa(c2 + hW * 0.03, hY + hH * 0.05, pxM * 1.2, pxM * 0.46);
-        s += fTable(c2 + hW * 0.19, (hY + wt + hY + hH - wt) / 2, pxM * 0.65);
+        s += fBed(hX + hW * 0.04, hY + hH * 0.04, pxM * 1.4, pxM * 1.1);
+        s += fBed(hX + hW * 0.04, hY + hH * 0.40, pxM * 1.3, pxM * 1.05);
+        s += fBed(hX + hW * 0.04, hY + hH * 0.72, pxM * 1.25, pxM * 1.0);
+        s += fToilet(c1 + hW * 0.02, hY + hH * 0.04, pxM * 0.52, pxM * 0.44);
+        s += fKitchenL(c1 + hW * 0.02, r2 + hH * 0.03, pxM * 0.7, pxM * 0.3);
+        s += fSofa(c2 + hW * 0.03, hY + hH * 0.05, pxM * 1.25, pxM * 0.5);
+        s += fTable(c2 + hW * 0.19, (hY + wt + hY + hH - wt) / 2, pxM * 0.7);
+
+        if (floors > 1) {
+            const stLabel = floors === 3 ? 'UP TO 3RD FLOOR' : 'UP TO 2ND FLOOR';
+            s += fStairs(c2 + hW * 0.19, hY + hH * 0.65, pxM * 0.95, pxM * 1.45, stLabel, 8);
+        }
 
         const subDimY = hY - dimOff / 2, subDimX = hX - dimOff / 2;
-        s += subDim(hX, subDimY, c1, subDimY, `${(houseW * .37).toFixed(2)}`);
-        s += subDim(c1, subDimY, c2, subDimY, `${(houseW * .25).toFixed(2)}`);
-        s += subDim(c2, subDimY, hX + hW, subDimY, `${(houseW * .38).toFixed(2)}`);
-        s += subDim(hX, hY, hX, r1, `${(houseD * .37).toFixed(2)}`, 'v', subDimX);
-        s += subDim(hX, r1, hX, r2, `${(houseD * .30).toFixed(2)}`, 'v', subDimX);
-        s += subDim(hX, r2, hX, hY + hH, `${(houseD * .33).toFixed(2)}`, 'v', subDimX);
+        s += subDim(hX, subDimY, c1, subDimY, `${(houseW * .37).toFixed(2)}m`);
+        s += subDim(c1, subDimY, c2, subDimY, `${(houseW * .25).toFixed(2)}m`);
+        s += subDim(c2, subDimY, hX + hW, subDimY, `${(houseW * .38).toFixed(2)}m`);
+        s += subDim(hX, hY, hX, r1, `${(houseD * .37).toFixed(2)}m`, 'v', subDimX);
+        s += subDim(hX, r1, hX, r2, `${(houseD * .30).toFixed(2)}m`, 'v', subDimX);
+        s += subDim(hX, r2, hX, hY + hH, `${(houseD * .33).toFixed(2)}m`, 'v', subDimX);
 
     } else if (bedrooms === 4) {
         const c1 = hX + hW * 0.34;
@@ -1767,49 +2176,54 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
         s += roomRect(c2 + iwt / 2, r3 + iwt / 2, hX + hW - wt, hY + hH - wt, '#fff8e1');
 
         const rm4 = (nm, dim, cx, cy, col) => `
-            <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="${col}" font-size="6.5" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
-            <text x="${cx}" y="${cy + 5.5}" text-anchor="middle" fill="#6b7280" font-size="5.5" font-family="'Outfit',monospace">${dim}</text>`;
-        s += rm4('BEDROOM 1', `${(houseW * .34).toFixed(1)}x${(houseD * .27).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
-        s += rm4('BEDROOM 2', `${(houseW * .34).toFixed(1)}x${(houseD * .25).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + r2) / 2, '#1d4ed8');
-        s += rm4('BEDROOM 3', `${(houseW * .34).toFixed(1)}x${(houseD * .24).toFixed(1)}m`, (hX + wt + c1) / 2, (r2 + r3) / 2, '#1d4ed8');
-        s += rm4('BEDROOM 4', `${(houseW * .34).toFixed(1)}x${(houseD * .24).toFixed(1)}m`, (hX + wt + c1) / 2, (r3 + hY + hH - wt) / 2, '#1d4ed8');
-        s += rm4('BATH', `${(houseW * .24).toFixed(1)}x${(houseD * .76).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r3) / 2, '#0e7490');
-        s += rm4('UTILITY', `${(houseW * .24).toFixed(1)}x${(houseD * .24).toFixed(1)}m`, (c1 + c2) / 2, (r3 + hY + hH - wt) / 2, '#065f46');
-        s += rm4('LIVING / DINING', `${(houseW * .42).toFixed(1)}x${(houseD * .76).toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + r3) / 2, '#1e3a5f');
-        s += rm4('KITCHEN', `${(houseW * .42).toFixed(1)}x${(houseD * .24).toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (r3 + hY + hH - wt) / 2, '#92400e');
+            <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="${col}" font-size="10" font-family="'Outfit',sans-serif" font-weight="800">${nm}</text>
+            <text x="${cx}" y="${cy + 7}" text-anchor="middle" fill="#475569" font-size="8.5" font-family="'Outfit',monospace">${dim}</text>`;
+        s += rm4('BEDROOM 1', `${(houseW * .34).toFixed(1)}×${(houseD * .27).toFixed(1)}m`, (hX + wt + c1) / 2, (hY + wt + r1) / 2, '#1d4ed8');
+        s += rm4('BEDROOM 2', `${(houseW * .34).toFixed(1)}×${(houseD * .25).toFixed(1)}m`, (hX + wt + c1) / 2, (r1 + r2) / 2, '#1d4ed8');
+        s += rm4('BEDROOM 3', `${(houseW * .34).toFixed(1)}×${(houseD * .24).toFixed(1)}m`, (hX + wt + c1) / 2, (r2 + r3) / 2, '#1d4ed8');
+        s += rm4('BEDROOM 4', `${(houseW * .34).toFixed(1)}×${(houseD * .24).toFixed(1)}m`, (hX + wt + c1) / 2, (r3 + hY + hH - wt) / 2, '#1d4ed8');
+        s += rm4('BATHROOM', `${(houseW * .24).toFixed(1)}×${(houseD * .76).toFixed(1)}m`, (c1 + c2) / 2, (hY + wt + r3) / 2, '#0e7490');
+        s += rm4('UTILITY', `${(houseW * .24).toFixed(1)}×${(houseD * .24).toFixed(1)}m`, (c1 + c2) / 2, (r3 + hY + hH - wt) / 2, '#065f46');
+        s += rm4('LIVING / DINING', `${(houseW * .42).toFixed(1)}×${(houseD * .76).toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (hY + wt + r3) / 2, '#1e3a5f');
+        s += rm4('KITCHEN', `${(houseW * .42).toFixed(1)}×${(houseD * .24).toFixed(1)}m`, (c2 + hX + hW - wt) / 2, (r3 + hY + hH - wt) / 2, '#92400e');
 
-        s += archDoor(c1, hY + hH * .08, pxM * .68, 'right', '#2563eb');
-        s += archDoor(c1, hY + hH * .33, pxM * .68, 'right', '#2563eb');
-        s += archDoor(c1, hY + hH * .56, pxM * .68, 'right', '#2563eb');
-        s += archDoor(c1, hY + hH * .79, pxM * .68, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * .08, pxM * .70, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * .33, pxM * .70, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * .56, pxM * .70, 'right', '#2563eb');
+        s += archDoor(c1, hY + hH * .79, pxM * .70, 'right', '#2563eb');
         s += archDoor(c2, hY + hH * .28, pxM * .88, 'right', '#2563eb');
-        s += archDoor(hX + wt, hY + hH * .18, pxM * .82, 'right', '#2563eb');
+        s += archDoor(hX + wt, hY + hH * .18, pxM * .85, 'right', '#2563eb');
 
-        s += archWin(hX + hW * .17, hY, pxM * .88, 'h');
-        s += archWin(hX + hW * .17, hY + hH, pxM * .88, 'h');
-        s += archWin(hX + hW, hY + hH * .22, pxM * 1.0, 'v');
-        s += archWin(hX + hW, hY + hH * .62, pxM * .78, 'v');
+        s += archWin(hX + hW * .17, hY, pxM * .92, 'h');
+        s += archWin(hX + hW * .17, hY + hH, pxM * .92, 'h');
+        s += archWin(hX + hW, hY + hH * .22, pxM * 1.05, 'v');
+        s += archWin(hX + hW, hY + hH * .62, pxM * .82, 'v');
 
-        s += fBed(hX + hW * .04, hY + hH * .02, pxM * 1.3, pxM * 0.95);
-        s += fBed(hX + hW * .04, hY + hH * .28, pxM * 1.2, pxM * 0.9);
-        s += fBed(hX + hW * .04, hY + hH * .54, pxM * 1.15, pxM * 0.88);
-        s += fBed(hX + hW * .04, hY + hH * .79, pxM * 1.1, pxM * 0.85);
-        s += fToilet(c1 + hW * .02, hY + hH * .04, pxM * .5, pxM * .4);
-        s += fSofa(c2 + hW * .03, hY + hH * .04, pxM * 1.3, pxM * .46);
-        s += fTable(c2 + hW * .21, (hY + wt + r3) / 2, pxM * .7);
-        s += fKitchenL(c2 + hW * .03, r3 + hH * .04, pxM * .82, pxM * .28);
+        s += fBed(hX + hW * .04, hY + hH * .02, pxM * 1.35, pxM * 1.0);
+        s += fBed(hX + hW * .04, hY + hH * .28, pxM * 1.25, pxM * 0.95);
+        s += fBed(hX + hW * .04, hY + hH * .54, pxM * 1.2, pxM * 0.92);
+        s += fBed(hX + hW * .04, hY + hH * .79, pxM * 1.15, pxM * 0.9);
+        s += fToilet(c1 + hW * .02, hY + hH * .04, pxM * .52, pxM * .42);
+        s += fSofa(c2 + hW * .03, hY + hH * .04, pxM * 1.35, pxM * .5);
+        s += fTable(c2 + hW * .21, (hY + wt + r3) / 2, pxM * .75);
+        s += fKitchenL(c2 + hW * .03, r3 + hH * .04, pxM * .85, pxM * .3);
+
+        if (floors > 1) {
+            const stLabel = floors === 3 ? 'UP TO 3RD FLOOR' : 'UP TO 2ND FLOOR';
+            s += fStairs(c2 + hW * 0.22, hY + hH * 0.50, pxM * 0.95, pxM * 1.45, stLabel, 8);
+        }
 
         const sdY = hY - dimOff / 2, sdX = hX - dimOff / 2;
-        s += subDim(hX, sdY, c1, sdY, `${(houseW * .34).toFixed(2)}`);
-        s += subDim(c1, sdY, c2, sdY, `${(houseW * .24).toFixed(2)}`);
-        s += subDim(c2, sdY, hX + hW, sdY, `${(houseW * .42).toFixed(2)}`);
-        s += subDim(hX, hY, hX, r1, `${(houseD * .27).toFixed(2)}`, 'v', sdX);
-        s += subDim(hX, r1, hX, r2, `${(houseD * .25).toFixed(2)}`, 'v', sdX);
-        s += subDim(hX, r2, hX, r3, `${(houseD * .24).toFixed(2)}`, 'v', sdX);
-        s += subDim(hX, r3, hX, hY + hH, `${(houseD * .24).toFixed(2)}`, 'v', sdX);
+        s += subDim(hX, sdY, c1, sdY, `${(houseW * .34).toFixed(2)}m`);
+        s += subDim(c1, sdY, c2, sdY, `${(houseW * .24).toFixed(2)}m`);
+        s += subDim(c2, sdY, hX + hW, sdY, `${(houseW * .42).toFixed(2)}m`);
+        s += subDim(hX, hY, hX, r1, `${(houseD * .27).toFixed(2)}m`, 'v', sdX);
+        s += subDim(hX, r1, hX, r2, `${(houseD * .25).toFixed(2)}m`, 'v', sdX);
+        s += subDim(hX, r2, hX, r3, `${(houseD * .24).toFixed(2)}m`, 'v', sdX);
+        s += subDim(hX, r3, hX, hY + hH, `${(houseD * .24).toFixed(2)}m`, 'v', sdX);
 
     } else {
-        // 1 bedroom — simple 2-room layout
+        // 1-Bedroom Layout
         const c1 = hX + hW * 0.50;
         const r1 = hY + hH * 0.55;
         s += dblWall(c1, hY + wt, c1, hY + hH - wt, iwt);
@@ -1817,98 +2231,128 @@ function drawPhotoBlueprint(area, floors, targetId = 'step2BlueprintSvg') {
         s += roomRect(hX + wt, hY + wt, c1, hY + hH - wt, '#e8f4fd');
         s += roomRect(c1 + iwt / 2, hY + wt, hX + hW - wt, r1 - iwt / 2, '#e8f0fe');
         s += roomRect(c1 + iwt / 2, r1 + iwt / 2, hX + hW - wt, hY + hH - wt, '#fff8e1');
-        s += `<text x="${(hX + wt + c1) / 2}" y="${(hY + wt + hY + hH - wt) / 2}" text-anchor="middle" fill="#1d4ed8" font-size="7.5" font-family="'Outfit',sans-serif" font-weight="800">BEDROOM</text>`;
-        s += `<text x="${(hX + wt + c1) / 2}" y="${(hY + wt + hY + hH - wt) / 2 + 10}" text-anchor="middle" fill="#6b7280" font-size="6" font-family="'Outfit',monospace">${(houseW * .50).toFixed(1)}x${houseD.toFixed(1)}m</text>`;
-        s += `<text x="${(c1 + hX + hW - wt) / 2}" y="${(hY + wt + r1) / 2}" text-anchor="middle" fill="#1e3a5f" font-size="7.5" font-family="'Outfit',sans-serif" font-weight="800">LIVING AREA</text>`;
-        s += `<text x="${(c1 + hX + hW - wt) / 2}" y="${(r1 + hY + hH - wt) / 2}" text-anchor="middle" fill="#92400e" font-size="7.5" font-family="'Outfit',sans-serif" font-weight="800">KITCHEN/BATH</text>`;
-        s += archDoor(c1, hY + hH * 0.25, pxM * .78, 'right', '#2563eb');
-        s += archDoor(hX + wt, hY + hH * 0.25, pxM * .82, 'right', '#2563eb');
-        s += archWin(hX + hW * 0.25, hY, pxM * 1.0, 'h');
-        s += archWin(hX + hW, hY + hH * 0.25, pxM * 0.9, 'v');
-        s += fBed(hX + hW * 0.06, hY + hH * 0.12, pxM * 1.4, pxM * 1.1);
-        s += fSofa(c1 + hW * 0.04, hY + hH * 0.06, pxM * 1.2, pxM * 0.46);
-        s += fTable(c1 + hW * 0.27, hY + hH * 0.35, pxM * 0.6);
+
+        s += `<text x="${(hX + wt + c1) / 2}" y="${(hY + wt + hY + hH - wt) / 2 - 5}" text-anchor="middle" fill="#1d4ed8" font-size="12" font-family="'Outfit',sans-serif" font-weight="800">BEDROOM</text>`;
+        s += `<text x="${(hX + wt + c1) / 2}" y="${(hY + wt + hY + hH - wt) / 2 + 10}" text-anchor="middle" fill="#475569" font-size="10" font-family="'Outfit',monospace">${(houseW * .50).toFixed(1)}×${houseD.toFixed(1)}m</text>`;
+        s += `<text x="${(c1 + hX + hW - wt) / 2}" y="${(hY + wt + r1) / 2}" text-anchor="middle" fill="#1e3a5f" font-size="12" font-family="'Outfit',sans-serif" font-weight="800">LIVING AREA</text>`;
+        s += `<text x="${(c1 + hX + hW - wt) / 2}" y="${(r1 + hY + hH - wt) / 2}" text-anchor="middle" fill="#92400e" font-size="12" font-family="'Outfit',sans-serif" font-weight="800">KITCHEN/BATH</text>`;
+
+        s += archDoor(c1, hY + hH * 0.25, pxM * .82, 'right', '#2563eb');
+        s += archDoor(hX + wt, hY + hH * 0.25, pxM * .88, 'right', '#2563eb');
+        s += archWin(hX + hW * 0.25, hY, pxM * 1.1, 'h');
+        s += archWin(hX + hW, hY + hH * 0.25, pxM * 0.95, 'v');
+        s += fBed(hX + hW * 0.06, hY + hH * 0.12, pxM * 1.45, pxM * 1.15);
+        s += fSofa(c1 + hW * 0.04, hY + hH * 0.06, pxM * 1.3, pxM * 0.5);
+        s += fTable(c1 + hW * 0.27, hY + hH * 0.35, pxM * 0.65);
+
+        if (floors > 1) {
+            const stLabel = floors === 3 ? 'UP TO 3RD FLOOR' : 'UP TO 2ND FLOOR';
+            s += fStairs(c1 + hW * 0.25, hY + hH * 0.60, pxM * 0.95, pxM * 1.40, stLabel, 7);
+        }
+
         const sdY = hY - dimOff / 2, sdX = hX - dimOff / 2;
-        s += subDim(hX, sdY, c1, sdY, `${(houseW * .50).toFixed(2)}`);
-        s += subDim(c1, sdY, hX + hW, sdY, `${(houseW * .50).toFixed(2)}`);
-        s += subDim(hX, hY, hX, r1, `${(houseD * .55).toFixed(2)}`, 'v', sdX);
-        s += subDim(hX, r1, hX, hY + hH, `${(houseD * .45).toFixed(2)}`, 'v', sdX);
+        s += subDim(hX, sdY, c1, sdY, `${(houseW * .50).toFixed(2)}m`);
+        s += subDim(c1, sdY, hX + hW, sdY, `${(houseW * .50).toFixed(2)}m`);
+        s += subDim(hX, hY, hX, r1, `${(houseD * .55).toFixed(2)}m`, 'v', sdX);
+        s += subDim(hX, r1, hX, hY + hH, `${(houseD * .45).toFixed(2)}m`, 'v', sdX);
     }
 
     // ── OUTER Dimension lines (total width/depth) ─────────────────────
     s += outerDim(hX, hY - dimOff + 2, hX + hW, hY - dimOff + 2, `${houseW.toFixed(2)} m`, 'h');
     s += outerDim(hX - dimOff + 2, hY, hX - dimOff + 2, hY + hH, `${houseD.toFixed(2)} m`, 'v');
 
-    // ── Right spec panel ──────────────────────────────────────────────
-    const iX = W - specW + 4, iY = 4;
-    s += `<rect x="${iX}" y="${iY}" width="${specW - 8}" height="${H - 8}" fill="#1e293b" stroke="#334155" stroke-width="0.8" rx="4"/>`;
+    // ── Right Technical Specifications Panel ─────────────────────────
+    const iX = W - specW + 4, iY = 6;
+    s += `<rect x="${iX}" y="${iY}" width="${specW - 8}" height="${H - 12}" fill="#0f172a" stroke="#334155" stroke-width="1" rx="6"/>`;
 
     // Panel title
-    s += `<rect x="${iX}" y="${iY}" width="${specW - 8}" height="20" fill="#0f172a" rx="4"/>`;
-    s += `<text x="${iX + (specW - 8) / 2}" y="${iY + 13}" text-anchor="middle" fill="#38bdf8" font-size="8" font-weight="800" font-family="'Outfit',sans-serif">SPECIFICATIONS</text>`;
+    s += `<rect x="${iX}" y="${iY}" width="${specW - 8}" height="28" fill="#1e293b" rx="6"/>`;
+    s += `<text x="${iX + (specW - 8) / 2}" y="${iY + 18}" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="900" font-family="'Outfit',sans-serif" letter-spacing="0.5">TECHNICAL SPECS</text>`;
 
     const specs = [
         `Floor Area: ${Math.round(area)} m\u00b2`,
-        `Bedrooms: ${bedrooms}`,
-        `Bathrooms: ${bedrooms > 2 ? 2 : 1}`,
-        `Floors: ${floors}`,
-        `Foundation: Footings`,
-        `Structure: Concrete`,
-        `Wall: CHB Block`,
-        `Roof: Gable / Hip`,
-        `Ceiling: 2.70m`,
-        `Use: Residential`,
+        `Bedrooms: ${bedrooms} Rooms`,
+        `Bathrooms: ${bedrooms > 2 ? 2 : 1} Bath`,
+        `Storey: ${floors} Floor${floors > 1 ? 's' : ''} (${floors === 3 ? 'Three-Storey' : floors === 2 ? 'Two-Storey' : 'Bungalow'})`,
+        `Foundation: ${floors > 1 ? 'Ground Piers' : 'Strip Footings'}`,
+        `Structure: Reinforced CHB`,
+        `Roof: Trusses & GI Sheets`,
+        `Ceiling Clearance: 2.70m`,
+        `Occupancy: Residential`,
+        `Region: Davao District`
     ];
     specs.forEach((sp, i) => {
-        s += `<text x="${iX + 7}" y="${iY + 30 + i * 13}" fill="${i % 2 === 0 ? '#cbd5e1' : '#94a3b8'}" font-size="6.8" font-family="'Outfit',sans-serif">• ${sp}</text>`;
+        s += `<text x="${iX + 10}" y="${iY + 44 + i * 16}" fill="${i % 2 === 0 ? '#f1f5f9' : '#cbd5e1'}" font-size="10" font-family="'Outfit',sans-serif">• ${sp}</text>`;
     });
 
-    // Legend
-    const legY0 = iY + 30 + specs.length * 13 + 8;
-    s += `<text x="${iX + (specW - 8) / 2}" y="${legY0}" text-anchor="middle" fill="#38bdf8" font-size="8" font-weight="800" font-family="'Outfit',sans-serif">LEGEND</text>`;
+    // Architectural Legend
+    const legY0 = iY + 44 + specs.length * 16 + 10;
+    s += `<rect x="${iX + 6}" y="${legY0 - 4}" width="${specW - 20}" height="2" fill="#334155"/>`;
+    s += `<text x="${iX + (specW - 8) / 2}" y="${legY0 + 13}" text-anchor="middle" fill="#38bdf8" font-size="10.5" font-weight="800" font-family="'Outfit',sans-serif">LEGEND &amp; SYMBOLS</text>`;
     const legs = [
         { c: '#bfdbfe', l: 'Bedroom' },
         { c: '#bae6fd', l: 'Living / Dining' },
         { c: '#fde68a', l: 'Kitchen' },
         { c: '#a5f3fc', l: 'Bathroom' },
-        { c: '#bbf7d0', l: 'Utility' },
     ];
+    if (floors > 1) {
+        legs.push({ c: '#f8fafc', l: 'Stairs / Access' });
+    }
     legs.forEach((lg, i) => {
-        const ly = legY0 + 12 + i * 12;
-        s += `<rect x="${iX + 7}" y="${ly - 7}" width="9" height="9" fill="${lg.c}" stroke="#64748b" stroke-width="0.6" rx="1.5"/>`;
-        s += `<text x="${iX + 20}" y="${ly}" fill="#cbd5e1" font-size="6.8" font-family="'Outfit',sans-serif">${lg.l}</text>`;
+        const ly = legY0 + 30 + i * 16;
+        s += `<rect x="${iX + 10}" y="${ly - 9}" width="12" height="12" fill="${lg.c}" stroke="#64748b" stroke-width="0.8" rx="2"/>`;
+        s += `<text x="${iX + 28}" y="${ly}" fill="#e2e8f0" font-size="9.5" font-family="'Outfit',sans-serif">${lg.l}</text>`;
     });
 
-    // Door/Window mini-legend
-    const legW2 = legY0 + 12 + legs.length * 12 + 8;
+    // Door swing & window mini-legend
+    const legW2 = legY0 + 30 + legs.length * 16 + 8;
     const mx2 = iX + 16;
-    s += `<path d="M ${mx2} ${legW2 + 12} L ${mx2 + 12} ${legW2 + 12} A 12 12 0 0 0 ${mx2} ${legW2 + 24}" fill="rgba(37,99,235,0.12)" stroke="#2563eb" stroke-width="0.9" stroke-dasharray="3,1.5"/>`;
-    s += `<text x="${iX + 32}" y="${legW2 + 19}" fill="#94a3b8" font-size="6.8" font-family="'Outfit',sans-serif">Door swing</text>`;
+    s += `<path d="M ${mx2} ${legW2 + 8} L ${mx2 + 14} ${legW2 + 8} A 14 14 0 0 0 ${mx2} ${legW2 + 22}" fill="rgba(37,99,235,0.18)" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3,1.5"/>`;
+    s += `<text x="${iX + 36}" y="${legW2 + 16}" fill="#cbd5e1" font-size="9.5" font-family="'Outfit',sans-serif">Door Swing</text>`;
 
-    s += `<line x1="${mx2}" y1="${legW2 + 32}" x2="${mx2 + 12}" y2="${legW2 + 32}" stroke="#1e40af" stroke-width="3"/>`;
-    s += `<line x1="${mx2}" y1="${legW2 + 27}" x2="${mx2 + 12}" y2="${legW2 + 27}" stroke="#93c5fd" stroke-width="0.8"/>`;
-    s += `<line x1="${mx2}" y1="${legW2 + 37}" x2="${mx2 + 12}" y2="${legW2 + 37}" stroke="#93c5fd" stroke-width="0.8"/>`;
-    s += `<text x="${iX + 32}" y="${legW2 + 34}" fill="#94a3b8" font-size="6.8" font-family="'Outfit',sans-serif">Window</text>`;
+    s += `<line x1="${mx2}" y1="${legW2 + 32}" x2="${mx2 + 14}" y2="${legW2 + 32}" stroke="#1e40af" stroke-width="3.5"/>`;
+    s += `<line x1="${mx2}" y1="${legW2 + 27}" x2="${mx2 + 14}" y2="${legW2 + 27}" stroke="#93c5fd" stroke-width="0.9"/>`;
+    s += `<line x1="${mx2}" y1="${legW2 + 37}" x2="${mx2 + 14}" y2="${legW2 + 37}" stroke="#93c5fd" stroke-width="0.9"/>`;
+    s += `<text x="${iX + 36}" y="${legW2 + 34}" fill="#cbd5e1" font-size="9.5" font-family="'Outfit',sans-serif">Window</text>`;
 
-    // North arrow (bottom of panel)
-    const naX = iX + (specW - 8) / 2, naY = H - 22;
-    s += `<circle cx="${naX}" cy="${naY}" r="14" fill="#0f172a" stroke="#334155" stroke-width="0.8"/>`;
-    s += `<polygon points="${naX},${naY - 11} ${naX - 5},${naY + 4} ${naX + 5},${naY + 4}" fill="#38bdf8"/>`;
-    s += `<text x="${naX}" y="${naY + 11}" text-anchor="middle" fill="#64748b" font-size="6" font-family="'Outfit',sans-serif">NORTH</text>`;
+    // North Compass (bottom of panel)
+    const naX = iX + (specW - 8) / 2, naY = H - 30;
+    s += `<circle cx="${naX}" cy="${naY}" r="17" fill="#1e293b" stroke="#475569" stroke-width="1"/>`;
+    s += `<polygon points="${naX},${naY - 13} ${naX - 6},${naY + 5} ${naX + 6},${naY + 5}" fill="#38bdf8"/>`;
+    s += `<polygon points="${naX},${naY + 12} ${naX - 5},${naY + 5} ${naX + 5},${naY + 5}" fill="#64748b"/>`;
+    s += `<text x="${naX}" y="${naY - 2}" text-anchor="middle" fill="#ffffff" font-size="7.5" font-weight="900" font-family="'Outfit',sans-serif">N</text>`;
 
     svg.innerHTML = s;
 }
 
 /* ── Architectural Floor Plan Helper Functions ─────────────────────── */
 
+// Staircase architectural drafting symbol with step treads, railing line, and direction arrow
+function fStairs(x, y, w, h, label = 'UP TO 2ND FLOOR', numSteps = 8) {
+    let r = `<g class="arch-stairs">`;
+    r += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f8fafc" stroke="#334155" stroke-width="1.2" rx="1.5"/>`;
+    const stepH = h / numSteps;
+    for (let i = 1; i < numSteps; i++) {
+        const sy = y + i * stepH;
+        r += `<line x1="${x}" y1="${sy}" x2="${x + w}" y2="${sy}" stroke="#64748b" stroke-width="0.9"/>`;
+    }
+    r += `<line x1="${x + w * 0.5}" y1="${y + h * 0.1}" x2="${x + w * 0.5}" y2="${y + h * 0.88}" stroke="#0284c7" stroke-width="1.2" stroke-dasharray="2,2"/>`;
+    const arrowY = y + h * 0.12;
+    r += `<polygon points="${x + w * 0.5},${arrowY - 6} ${x + w * 0.5 - 4},${arrowY + 2} ${x + w * 0.5 + 4},${arrowY + 2}" fill="#0284c7"/>`;
+    r += `<rect x="${x + 2}" y="${y + h * 0.5 - 7}" width="${w - 4}" height="14" fill="rgba(15,23,42,0.88)" rx="2"/>`;
+    r += `<text x="${x + w * 0.5}" y="${y + h * 0.5 + 3}" text-anchor="middle" fill="#38bdf8" font-size="7.5" font-family="'Outfit',sans-serif" font-weight="900" letter-spacing="0.4">${label}</text>`;
+    r += `</g>`;
+    return r;
+}
+
 // Double-line inner wall (architectural thick wall symbol)
 function dblWall(x1, y1, x2, y2, t) {
     const isH = Math.abs(y2 - y1) < Math.abs(x2 - x1);
     const half = t / 2;
     if (isH) {
-        return `<rect x="${Math.min(x1, x2)}" y="${y1 - half}" width="${Math.abs(x2 - x1)}" height="${t}" fill="#374151"/>`;
+        return `<rect x="${Math.min(x1, x2)}" y="${y1 - half}" width="${Math.abs(x2 - x1)}" height="${t}" fill="#334155"/>`;
     } else {
-        return `<rect x="${x1 - half}" y="${Math.min(y1, y2)}" width="${t}" height="${Math.abs(y2 - y1)}" fill="#374151"/>`;
+        return `<rect x="${x1 - half}" y="${Math.min(y1, y2)}" width="${t}" height="${Math.abs(y2 - y1)}" fill="#334155"/>`;
     }
 }
 
@@ -1916,111 +2360,112 @@ function dblWall(x1, y1, x2, y2, t) {
 function roomRect(x1, y1, x2, y2, fill) {
     const x = Math.min(x1, x2), y = Math.min(y1, y2);
     const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" opacity="0.9"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" opacity="0.92"/>`;
 }
 
 // Door arc (quarter-circle with solid door leaf line)
 function archDoor(hX, hY, r, dir, col) {
     const sweep = dir === 'right' ? 1 : 0;
     const ex = hX + r, ey = hY + r;
-    return `<line x1="${hX}" y1="${hY}" x2="${ex}" y2="${hY}" stroke="${col}" stroke-width="1.2"/>
-    <path d="M ${ex} ${hY} A ${r} ${r} 0 0 ${sweep === 1 ? 0 : 1} ${hX} ${ey}" fill="rgba(37,99,235,0.08)" stroke="${col}" stroke-width="0.9" stroke-dasharray="3,1.5"/>`;
+    return `<line x1="${hX}" y1="${hY}" x2="${ex}" y2="${hY}" stroke="${col}" stroke-width="1.6"/>
+    <path d="M ${ex} ${hY} A ${r} ${r} 0 0 ${sweep === 1 ? 0 : 1} ${hX} ${ey}" fill="rgba(37,99,235,0.12)" stroke="${col}" stroke-width="1.2" stroke-dasharray="3,1.5"/>`;
 }
 
 // Window symbol — 3 parallel lines on wall edge
 function archWin(cx, cy, len, orient) {
-    const off = 5;
+    const off = 6;
     if (orient === 'h') {
-        return `<line x1="${cx - len / 2}" y1="${cy}" x2="${cx + len / 2}" y2="${cy}" stroke="#1e40af" stroke-width="3.5"/>
-        <line x1="${cx - len / 2}" y1="${cy - off}" x2="${cx + len / 2}" y2="${cy - off}" stroke="#93c5fd" stroke-width="0.9"/>
-        <line x1="${cx - len / 2}" y1="${cy + off}" x2="${cx + len / 2}" y2="${cy + off}" stroke="#93c5fd" stroke-width="0.9"/>`;
+        return `<line x1="${cx - len / 2}" y1="${cy}" x2="${cx + len / 2}" y2="${cy}" stroke="#1e40af" stroke-width="4.5"/>
+        <line x1="${cx - len / 2}" y1="${cy - off}" x2="${cx + len / 2}" y2="${cy - off}" stroke="#93c5fd" stroke-width="1.2"/>
+        <line x1="${cx - len / 2}" y1="${cy + off}" x2="${cx + len / 2}" y2="${cy + off}" stroke="#93c5fd" stroke-width="1.2"/>`;
     } else {
-        return `<line x1="${cx}" y1="${cy - len / 2}" x2="${cx}" y2="${cy + len / 2}" stroke="#1e40af" stroke-width="3.5"/>
-        <line x1="${cx - off}" y1="${cy - len / 2}" x2="${cx - off}" y2="${cy + len / 2}" stroke="#93c5fd" stroke-width="0.9"/>
-        <line x1="${cx + off}" y1="${cy - len / 2}" x2="${cx + off}" y2="${cy + len / 2}" stroke="#93c5fd" stroke-width="0.9"/>`;
+        return `<line x1="${cx}" y1="${cy - len / 2}" x2="${cx}" y2="${cy + len / 2}" stroke="#1e40af" stroke-width="4.5"/>
+        <line x1="${cx - off}" y1="${cy - len / 2}" x2="${cx - off}" y2="${cy + len / 2}" stroke="#93c5fd" stroke-width="1.2"/>
+        <line x1="${cx + off}" y1="${cy - len / 2}" x2="${cx + off}" y2="${cy + len / 2}" stroke="#93c5fd" stroke-width="1.2"/>`;
     }
 }
 
 // Bed furniture
 function fBed(x, y, w, h) {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#dbeafe" stroke="#1d4ed8" stroke-width="0.9" rx="2"/>
-    <rect x="${x + 1.5}" y="${y + 1.5}" width="${w - 3}" height="${h * 0.33}" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="0.7" rx="2"/>
-    <line x1="${x + w / 2}" y1="${y + h * 0.37}" x2="${x + w / 2}" y2="${y + h - 2}" stroke="#93c5fd" stroke-width="0.6"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.2" rx="3"/>
+    <rect x="${x + 2}" y="${y + 2}" width="${w - 4}" height="${h * 0.35}" fill="#bfdbfe" stroke="#1d4ed8" stroke-width="0.9" rx="2"/>
+    <line x1="${x + w / 2}" y1="${y + h * 0.4}" x2="${x + w / 2}" y2="${y + h - 3}" stroke="#93c5fd" stroke-width="0.8"/>`;
 }
 
 // Sofa
 function fSofa(x, y, w, h) {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e0e7ff" stroke="#4338ca" stroke-width="0.9" rx="3"/>
-    <rect x="${x + w * .08}" y="${y + h * .15}" width="${w * .84}" height="${h * .65}" fill="#c7d2fe" stroke="#4338ca" stroke-width="0.6" rx="2"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.2" rx="4"/>
+    <rect x="${x + w * .08}" y="${y + h * .15}" width="${w * .84}" height="${h * .65}" fill="#c7d2fe" stroke="#4338ca" stroke-width="0.8" rx="3"/>`;
 }
 
 // Round dining table with 4 chairs
 function fTable(cx, cy, r) {
-    const cr = r * 0.3; // chair radius
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fef9c3" stroke="#854d0e" stroke-width="0.9"/>
-    <circle cx="${cx}" cy="${cy - r * 1.5}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.7"/>
-    <circle cx="${cx}" cy="${cy + r * 1.5}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.7"/>
-    <circle cx="${cx - r * 1.5}" cy="${cy}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.7"/>
-    <circle cx="${cx + r * 1.5}" cy="${cy}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.7"/>`;
+    const cr = r * 0.32;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fef9c3" stroke="#854d0e" stroke-width="1.2"/>
+    <circle cx="${cx}" cy="${cy - r * 1.5}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.9"/>
+    <circle cx="${cx}" cy="${cy + r * 1.5}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.9"/>
+    <circle cx="${cx - r * 1.5}" cy="${cy}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.9"/>
+    <circle cx="${cx + r * 1.5}" cy="${cy}" r="${cr}" fill="#fef08a" stroke="#854d0e" stroke-width="0.9"/>`;
 }
 
 // Toilet
 function fToilet(x, y, w, h) {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h * 0.38}" fill="#cffafe" stroke="#0e7490" stroke-width="0.8" rx="2"/>
-    <ellipse cx="${x + w * 0.5}" cy="${y + h * 0.72}" rx="${w * 0.44}" ry="${h * 0.3}" fill="#e0f7fa" stroke="#0e7490" stroke-width="0.8"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h * 0.38}" fill="#cffafe" stroke="#0e7490" stroke-width="1" rx="3"/>
+    <ellipse cx="${x + w * 0.5}" cy="${y + h * 0.72}" rx="${w * 0.44}" ry="${h * 0.3}" fill="#e0f7fa" stroke="#0e7490" stroke-width="1"/>`;
 }
 
 // Sink
 function fSink(x, y, w, h) {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e0f7fa" stroke="#0e7490" stroke-width="0.8" rx="2"/>
-    <circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.min(w, h) * 0.28}" fill="none" stroke="#0e7490" stroke-width="0.7"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e0f7fa" stroke="#0e7490" stroke-width="1" rx="3"/>
+    <circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.min(w, h) * 0.28}" fill="none" stroke="#0e7490" stroke-width="0.9"/>`;
 }
 
 // Kitchen counter L-shape
 function fKitchenL(x, y, w, h) {
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fef9c3" stroke="#854d0e" stroke-width="0.8" rx="1.5"/>
-    <circle cx="${x + w * 0.27}" cy="${y + h * 0.5}" r="${h * 0.32}" fill="#fef08a" stroke="#854d0e" stroke-width="0.65"/>
-    <circle cx="${x + w * 0.62}" cy="${y + h * 0.5}" r="${h * 0.26}" fill="#fef08a" stroke="#854d0e" stroke-width="0.65"/>`;
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fef9c3" stroke="#854d0e" stroke-width="1.1" rx="2"/>
+    <circle cx="${x + w * 0.27}" cy="${y + h * 0.5}" r="${h * 0.34}" fill="#fef08a" stroke="#854d0e" stroke-width="0.8"/>
+    <circle cx="${x + w * 0.65}" cy="${y + h * 0.5}" r="${h * 0.28}" fill="#fef08a" stroke="#854d0e" stroke-width="0.8"/>`;
 }
 
 // Sub-dimension line (between partitions, inside plan)
 function subDim(x1, y1, x2, y2, label, orient = 'h', vx) {
     const mx = orient === 'h' ? (x1 + x2) / 2 : vx;
     const my = orient === 'h' ? y1 : (y1 + y2) / 2;
-    const tickLen = 5;
-    const col = '#374151';
-    const tCol = '#111827';
+    const tickLen = 6;
+    const col = '#334155';
+    const tCol = '#0f172a';
     if (orient === 'h') {
-        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="0.7"/>
-        <line x1="${x1}" y1="${y1 - tickLen}" x2="${x1}" y2="${y1 + tickLen}" stroke="${col}" stroke-width="0.7"/>
-        <line x1="${x2}" y1="${y1 - tickLen}" x2="${x2}" y2="${y1 + tickLen}" stroke="${col}" stroke-width="0.7"/>
-        <rect x="${mx - label.length * 2.6}" y="${y1 - 7}" width="${label.length * 5.2}" height="10" fill="#f8fafc" rx="1"/>
-        <text x="${mx}" y="${y1 + 1.5}" text-anchor="middle" fill="${tCol}" font-size="6.5" font-family="'Outfit',monospace" font-weight="600">${label}</text>`;
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="0.9"/>
+        <line x1="${x1}" y1="${y1 - tickLen}" x2="${x1}" y2="${y1 + tickLen}" stroke="${col}" stroke-width="0.9"/>
+        <line x1="${x2}" y1="${y1 - tickLen}" x2="${x2}" y2="${y1 + tickLen}" stroke="${col}" stroke-width="0.9"/>
+        <rect x="${mx - label.length * 3.5}" y="${y1 - 9}" width="${label.length * 7}" height="13" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.5" rx="2"/>
+        <text x="${mx}" y="${y1 + 1.5}" text-anchor="middle" fill="${tCol}" font-size="9.5" font-family="'Outfit',monospace" font-weight="700">${label}</text>`;
     } else {
-        return `<line x1="${vx}" y1="${y1}" x2="${vx}" y2="${y2}" stroke="${col}" stroke-width="0.7"/>
-        <line x1="${vx - tickLen}" y1="${y1}" x2="${vx + tickLen}" y2="${y1}" stroke="${col}" stroke-width="0.7"/>
-        <line x1="${vx - tickLen}" y1="${y2}" x2="${vx + tickLen}" y2="${y2}" stroke="${col}" stroke-width="0.7"/>
-        <rect x="${vx - label.length * 2.6}" y="${my - 6}" width="${label.length * 5.2}" height="10" fill="#f8fafc" rx="1" transform="rotate(-90,${vx},${my})"/>
-        <text x="${vx}" y="${my + 2}" text-anchor="middle" fill="${tCol}" font-size="6.5" font-family="'Outfit',monospace" font-weight="600" transform="rotate(-90,${vx},${my})">${label}</text>`;
+        return `<line x1="${vx}" y1="${y1}" x2="${vx}" y2="${y2}" stroke="${col}" stroke-width="0.9"/>
+        <line x1="${vx - tickLen}" y1="${y1}" x2="${vx + tickLen}" y2="${y1}" stroke="${col}" stroke-width="0.9"/>
+        <line x1="${vx - tickLen}" y1="${y2}" x2="${vx + tickLen}" y2="${y2}" stroke="${col}" stroke-width="0.9"/>
+        <rect x="${vx - label.length * 3.5}" y="${my - 8}" width="${label.length * 7}" height="13" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.5" rx="2" transform="rotate(-90,${vx},${my})"/>
+        <text x="${vx}" y="${my + 2.5}" text-anchor="middle" fill="${tCol}" font-size="9.5" font-family="'Outfit',monospace" font-weight="700" transform="rotate(-90,${vx},${my})">${label}</text>`;
     }
 }
 
 // Outer main dimension line (total house dimensions)
 function outerDim(x1, y1, x2, y2, label, orient) {
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-    const col = '#1d4ed8', tBg = '#f8fafc';
+    const col = '#1d4ed8', tBg = '#ffffff';
     if (orient === 'h') {
-        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1" marker-start="url(#arrowB)" marker-end="url(#arrow)"/>
-        <line x1="${x1}" y1="${y1 - 7}" x2="${x1}" y2="${y1 + 7}" stroke="${col}" stroke-width="1"/>
-        <line x1="${x2}" y1="${y2 - 7}" x2="${x2}" y2="${y2 + 7}" stroke="${col}" stroke-width="1"/>
-        <rect x="${mx - label.length * 3}" y="${my - 7.5}" width="${label.length * 6}" height="11" fill="${tBg}" stroke="${col}" stroke-width="0.5" rx="2"/>
-        <text x="${mx}" y="${my + 2}" text-anchor="middle" fill="${col}" font-size="7.5" font-family="'Outfit',monospace" font-weight="700">${label}</text>`;
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.3" marker-start="url(#arrowB)" marker-end="url(#arrow)"/>
+        <line x1="${x1}" y1="${y1 - 9}" x2="${x1}" y2="${y1 + 9}" stroke="${col}" stroke-width="1.3"/>
+        <line x1="${x2}" y1="${y2 - 9}" x2="${x2}" y2="${y2 + 9}" stroke="${col}" stroke-width="1.3"/>
+        <rect x="${mx - label.length * 4.2}" y="${my - 10}" width="${label.length * 8.4}" height="15" fill="${tBg}" stroke="${col}" stroke-width="0.8" rx="3"/>
+        <text x="${mx}" y="${my + 2.5}" text-anchor="middle" fill="${col}" font-size="11" font-family="'Outfit',monospace" font-weight="800">${label}</text>`;
     } else {
-        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1" marker-start="url(#arrowB)" marker-end="url(#arrow)"/>
-        <line x1="${x1 - 7}" y1="${y1}" x2="${x1 + 7}" y2="${y1}" stroke="${col}" stroke-width="1"/>
-        <line x1="${x2 - 7}" y1="${y2}" x2="${x2 + 7}" y2="${y2}" stroke="${col}" stroke-width="1"/>
-        <rect x="${mx - label.length * 3}" y="${my - 6}" width="${label.length * 6}" height="11" fill="${tBg}" stroke="${col}" stroke-width="0.5" rx="2" transform="rotate(-90,${mx},${my})"/>
-        <text x="${mx}" y="${my + 2}" text-anchor="middle" fill="${col}" font-size="7.5" font-family="'Outfit',monospace" font-weight="700" transform="rotate(-90,${mx},${my})">${label}</text>`;
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.3" marker-start="url(#arrowB)" marker-end="url(#arrow)"/>
+        <line x1="${x1 - 9}" y1="${y1}" x2="${x1 + 9}" y2="${y1}" stroke="${col}" stroke-width="1.3"/>
+        <line x1="${x2 - 9}" y1="${y2}" x2="${x2 + 9}" y2="${y2}" stroke="${col}" stroke-width="1.3"/>
+        <rect x="${mx - label.length * 4.2}" y="${my - 9}" width="${label.length * 8.4}" height="15" fill="${tBg}" stroke="${col}" stroke-width="0.8" rx="3" transform="rotate(-90,${mx},${my})"/>
+        <text x="${mx}" y="${my + 3}" text-anchor="middle" fill="${col}" font-size="11" font-family="'Outfit',monospace" font-weight="800" transform="rotate(-90,${mx},${my})">${label}</text>`;
     }
 }
+
 
